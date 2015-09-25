@@ -4,10 +4,9 @@
   "description": "",
   "main": "lib/index.js",
   "scripts": {
-    "test": "mocha tests/* --recursive",
-    "test-live": "mocha tests/* --recursive --watch"
+    "test": "mocha --recursive tests/* lib/*"
   },
-  "author": "Elisha Fitch-Cook <elisha@cooper.com> (https://github.com/elishacook)",
+  "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
     "jsondiffpatch": "^0.1.33",

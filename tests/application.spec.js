@@ -6,25 +6,20 @@ var Application = require('../lib/application'),
 
 describe('Application', function ()
 {
-    it('can be initialized with an io', function ()
-    {
-        var app = new Application('io')
-        expect(app.io).to.equal('io')
-    })
-    
     it('has a service method', function ()
     {
         var app = new Application()
         expect(app.service).to.not.be.undefined
     })
     
-    it('can create a service by passing a name and options', function ()
+    it('can create a service by passing a name and methods', function ()
     {
         var app = new Application(),
-            foo = app.service('foo', { option: 123 })
+            foo = app.service('foo', { bar: function () {} })
         
         expect(foo.constructor).to.equal(Service)
-        expect(foo.options).to.deep.equal({ option: 123 })
+        expect(foo.bar).to.not.be.undefined
+        expect(typeof foo.bar).to.equal("function")
     })
     
     it('can retrieve a service by name', function ()
