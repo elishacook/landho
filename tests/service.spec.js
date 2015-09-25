@@ -114,4 +114,54 @@ describe('Service', function ()
             foo.after({ things: function () {} })
         }).to.throw('Attempting to hook unregistered method "things"')
     })
+    
+    it('returns the value from a method result that has a feed if the caller does not provide a subscriber', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params)
+            {
+                return {
+                    value: function (done)
+                    {
+                        done(null, 123)
+                    },
+                    feed: function (subscriber, done)
+                    {
+                        return { close: function () {} }
+                    }
+                }
+            }
+        })
+        foo.stuff({}, function (err, result)
+        {
+            expect(result).to.equal(123)
+            done()
+        })
+    })
+    
+    it('returns the feed object when a method result has a feed and the caller provides a subscriber', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params)
+            {
+                return {
+                    value: function (done)
+                    {
+                        done(null, 123)
+                    },
+                    feed: function (subscriber, done)
+                    {
+                        done(null, { close: function () {} })
+                    }
+                }
+            }
+        })
+        foo.stuff({ subscriber: {} }, function (err, result)
+        {
+            expect(result.close).to.not.be.undefined
+            done()
+        })
+    })
 })

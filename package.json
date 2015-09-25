@@ -9,9 +9,6 @@
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
-    "jsondiffpatch": "^0.1.33",
-    "rethinkdb-init": "0.0.4",
-    "rethinkdbdash": "^2.0.16"
   },
   "devDependencies": {
     "chai": "^3.0.0",
