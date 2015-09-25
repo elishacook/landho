@@ -1,8 +1,8 @@
 {
-  "name": "pink.io",
+  "name": "landho",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "lib/index.js",
   "scripts": {
     "test": "mocha tests/* --recursive",
     "test-live": "mocha tests/* --recursive --watch"
@@ -10,14 +10,12 @@
   "author": "Elisha Fitch-Cook <elisha@cooper.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
-    "jiff": "^0.7.2",
     "jsondiffpatch": "^0.1.33",
     "rethinkdb-init": "0.0.4",
     "rethinkdbdash": "^2.0.16"
   },
   "devDependencies": {
     "chai": "^3.0.0",
-    "fake-indexeddb": "^1.0.3",
     "mocha": "^2.2.5",
     "sinon": "^1.15.4",
     "sinon-chai": "^2.8.0"
