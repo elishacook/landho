@@ -164,4 +164,23 @@ describe('Service', function ()
             done()
         })
     })
+    
+    it('returns an error when calling a feed-only method without a subscriber', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params)
+            {
+                return {
+                    feed: function () {}
+                }
+            }
+        })
+        
+        foo.stuff({}, function (err)
+        {
+            expect(err.message).to.equal('Attempt to call a feed-only method without a subscriber')
+            done()
+        })
+    })
 })
