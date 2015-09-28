@@ -9,6 +9,8 @@
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
+    "eventemitter2": "^0.4.14",
+    "socket.io-events": "^0.4.6"
   },
   "devDependencies": {
     "chai": "^3.0.0",

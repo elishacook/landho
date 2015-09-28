@@ -122,13 +122,13 @@ describe('Service', function ()
             stuff: function (params)
             {
                 return {
-                    value: function (done)
+                    initial: function (done)
                     {
                         done(null, 123)
                     },
-                    feed: function (subscriber, done)
+                    changes: function (subscriber, done)
                     {
-                        return { close: function () {} }
+                        done(null, { close: function () {} })
                     }
                 }
             }
@@ -140,47 +140,84 @@ describe('Service', function ()
         })
     })
     
-    it('returns the feed object when a method result has a feed and the caller provides a subscriber', function (done)
+    it('emits the initial event on a subscriber when a subscriber is provided for a method without a feed', function (done)
     {
         var foo = new Service('foo',
         {
-            stuff: function (params)
+            stuff: function (params, done)
+            {
+                done(null, 123)
+            }
+        })
+        
+        foo.stuff(
+            {
+                subscriber: {
+                    emit: function (event, value)
+                    {
+                        expect(event).to.equal('initial')
+                        expect(value).to.equal(123)
+                        done()
+                    }
+                }
+            },
+            function ()
+            {
+                
+            }
+        )
+    })
+    
+    it('passes the feed as the result argument to the callback when a subscriber is provided to a feed method', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
             {
                 return {
-                    value: function (done)
+                    initial: function (done)
                     {
                         done(null, 123)
                     },
-                    feed: function (subscriber, done)
+                    changes: function (subscriber, done)
                     {
                         done(null, { close: function () {} })
                     }
                 }
             }
         })
-        foo.stuff({ subscriber: {} }, function (err, result)
-        {
-            expect(result.close).to.not.be.undefined
-            done()
-        })
+        
+        foo.stuff(
+            { subscriber: { emit: function (event, value) {} } },
+            function (err, feed)
+            {
+                expect(err).to.be.null
+                expect(feed).to.not.be.undefined
+                expect(feed.close).to.not.be.undefined
+                done()
+            }
+        )
     })
     
-    it('returns an error when calling a feed-only method without a subscriber', function (done)
+    it('has a null result when calling a non-feed method with a subscriber', function (done)
     {
         var foo = new Service('foo',
         {
-            stuff: function (params)
+            stuff: function (params, done)
             {
-                return {
-                    feed: function () {}
-                }
+                done(null, 123)
             }
         })
         
-        foo.stuff({}, function (err)
-        {
-            expect(err.message).to.equal('Attempt to call a feed-only method without a subscriber')
-            done()
-        })
+        foo.stuff(
+            { subscriber: { emit: function (event, value) {} } },
+            function (err, feed)
+            {
+                expect(err).to.be.null
+                expect(feed).to.be.null
+                done()
+            }
+        )
     })
+    
 })

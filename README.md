@@ -14,7 +14,8 @@ A data service library for node.
 ## What you get
 
 * One API for creating services with both request/response and realtime feed models
-* [TODO] Express and Socket.IO support
+* Socket.IO integration
+* [TODO] Express integration
 * Hooks so you can validate, authorize or do whatever
 * Frequent, wistful imaginings involving crow's nests and shouting
 

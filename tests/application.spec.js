@@ -31,10 +31,12 @@ describe('Application', function ()
         expect(foo2).to.equal(foo)
     })
     
-    it('throws an error when trying to fetch an unregistered service', function ()
+    it('returns undefined when trying to fetch an unregistered service', function ()
     {
-        var app = new Application()
-        expect(app.service.bind(app, 'foo')).to.throw('No service registered with the name "foo"')
+        var app = new Application(),
+            service = app.service('foo')
+        
+        expect(service).to.be.undefined
     })
     
     it('throws an error when trying to register a service that was already registered', function ()
