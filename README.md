@@ -6,8 +6,7 @@ A data service library for node.
 
 
 * [Install](#install)
-* [Quick Start](#quick-start)
-* [Extensions](#extensions)
+* [Flavor](#flavor)
 * [Guide](#guide)
 * [API Docs](#api-docs)
 
@@ -25,9 +24,80 @@ A data service library for node.
 npm install --save landho
 ```
 
-## Quick start
+## Flavor
 
-You create an API object and add services to it.
+```js
+
+var landho = require('landho'),
+    // Create a landho instance
+    api = landho(),
+    // Create a socket.io server
+    io = require('socket.io').listen(5000)
+
+api
+    // Setup the landho instance to use the socket.io server
+    .configure(landho.socket(io))
+    
+    // Create a new service with a single method called 'counter'
+    .service('foo',
+    {
+        counter: function (params)
+        {
+            // Return a feed object that updates a counter and pushes
+            // the changes to a subscriber
+            return {
+                initial: function (done) { done(null, params.start) },
+                changes: function (subscriber, done)
+                {
+                    var c = params.start,
+                        interval = setInterval(function ()
+                        {
+                            subscriber.emit('update', ++c)
+                        }, 500)
+                        
+                    done(null, { close: clearInterval.bind(null, interval) })
+                }
+            }
+        }
+    })
+    // add a hook before the counter method that messes with the parameters
+    .before(
+    {
+        counter: function (params, next)
+        {
+            if (!params.start)
+            {
+                params.start = 0
+            }
+            
+            params.start = params.start * params.start
+        }
+    })
+
+// Create a client and connect to the socket.io server
+var client = require('socket.io-client').connect('http://0.0.0.0:5000', { transports: ['websocket'] })
+
+// Call the counter() method on the 'foo' service
+client.emit('foo counter', { start: 10 }, function (err, feed_id)
+{
+    // Use the feed_id passed to the acknowledgement callback
+    // to set up listeners for the feed events
+    client.on(feed_id+' inital', function (c)
+    {
+        console.log(c) // -> 100
+    })
+    
+    client.on(feed_id+' update', function (c)
+    {
+        console.log(c) // -> 101...102...103...
+    })
+})
+
+```
+
+## Guide
+
+To start, you create an API object and add services to it.
 
 ```js
 
@@ -58,15 +128,7 @@ api.service('calculator').add(
 )
 ```
 
-As you can see, services are basically collections of methods written standard node continuation style. This is how you create services with request/response model. There's lots more you can do.
-
-## Extensions
-
-There will be an extension for quickly creating services backed by rethinkdb.
-
-## Guide
-
-In the [quick start](#quick-start) we saw how to create simple service with a request/response model. Let's learn some more.
+As you can see, services are basically collections of methods written in standard node continuation style. This is how you create services with a request/response model. There's lots more you can do.
 
 ### Creating realtime feeds
 
@@ -254,6 +316,39 @@ api.service('list').get({}, function (err, result)
 ```
 
 It's important to note that `after` hooks are never called when subscribing to a feed.
+
+### Socket.IO integration
+
+Landho can integrate with a [socket.io](http://socket.io/) server. You can set it up like this:
+
+```js
+var landho = require('landho'),
+    api = landho(),
+    io = require('socket.io').listen(5000)
+
+api.configure(landho.socket(io))
+```
+
+That's all that's needed. To call methods using the socket.io client, pass in the service name and the method name separated by spaces and use the acknowledgement callback to register listeners for the feed events. This is how it's done regardless of whether you are calling a feed method or a request/response method. For example...
+
+```js
+api.service('calc',
+{
+    add: function (params, done)
+    {
+        done(null, params.a + params.b)
+    }
+})
+
+var client = require('socket.io-client').connect('http://0.0.0.0:5000', { transports: ['websocket'] })
+client.emit('calc add', { a: 63, b: 198 }, function (err, feed_id)
+{
+    client.on(feed_id + ' initial', function (result)
+    {
+        console.log(result) // -> 261
+    })
+})
+```
 
 # API Docs
 

@@ -9,13 +9,14 @@
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
-    "eventemitter2": "^0.4.14",
-    "socket.io-events": "^0.4.6"
+    "socketio-wildcard": "^0.1.1"
   },
   "devDependencies": {
     "chai": "^3.0.0",
     "mocha": "^2.2.5",
     "sinon": "^1.15.4",
-    "sinon-chai": "^2.8.0"
+    "sinon-chai": "^2.8.0",
+    "socket.io": "^1.3.7",
+    "socket.io-client": "^1.3.7"
   }
 }
