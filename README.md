@@ -2,7 +2,7 @@
 
 A data service library for node.
 
-[![Build Status][1]][2] [![Coverage Status][3]][4]
+[![Build Status][1]][2] [![Coverage Status][3]][4] [![NPM version][5]][6]
 
 * [Install](#install)
 * [Flavor](#flavor)
@@ -542,3 +542,5 @@ See the [hooks section](#hooks) of the guide for examples of before and after ho
 [2]: https://travis-ci.org/elishacook/landho
 [3]: http://img.shields.io/coveralls/elishacook/landho.svg
 [4]: https://coveralls.io/r/elishacook/landho
+[5]: https://badge.fury.io/js/mchammer.svg
+[6]: https://badge.fury.io/js/mchammer
