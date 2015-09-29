@@ -8,6 +8,11 @@ A data service library for node.
 * [Install](#install)
 * [Flavor](#flavor)
 * [Guide](#guide)
+   * [Basics](#basics)
+   * [Creating realtime feeds](#creating-realtime-feeds)
+   * [Feed calling styles](#feed-calling-styles)
+   * [Before and after hooks](#hooks)
+   * [Socket.IO integration](#socketio-integration)
 * [API Docs](#api-docs)
 
 ## What you get
@@ -97,6 +102,8 @@ client.emit('foo counter', { start: 10 }, function (err, feed_id)
 
 ## Guide
 
+### Basics
+
 To start, you create an API object and add services to it.
 
 ```js
@@ -144,19 +151,23 @@ api.service('counter',
     // It doesn't get used when we return a feed object.
     create: function (params)
     {
+        // Feed objects have two methods. inital() sets the initial value
+        // and changes() notifies subscribers about changes.
         return {
-            // The feed takes a subscriber object and calls its
-            // methods when changes occur.
-            feed: function (subscriber, done)
+            initial: function (done)
+            {
+                done(null, 0)
+            },
+            changes: function (subscriber, done)
             {
                 var counter = 0
                 var interval = setInterval(function ()
                 {
                     counter += 1
                     
-                    // Updating the subscriber each time the count
+                    // Updates the subscriber each time the count
                     // is incremented
-                    subscriber.update(counter)
+                    subscriber.emit('update', counter)
                 }, 1000)
                 
                 // Call the callback with an object that has a `close()`
@@ -177,23 +188,26 @@ api.service('counter').create(
     {
         subscriber: {
             // Gets called on each increment
-            update: function (n)
+            emit: function (event, value)
             {
-                console.log(n) // 0...1...2...3...4...
+                console.log(event, value) // 'initial' 0...'update' 1...'update' 2...
             }
         }
     },
     function (err, feed)
     {
         // And when we are done, we'll want to close the feed
-        feed.close()
+        setTimeout(function ()
+        {
+            feed.close()
+        }, 10000)
     }
 )
 ```
 
-### Supporting both feeds and request/response
+### Feed calling styles
 
-Services can support both request/response and feed models by returning an object that has both a `feed` and a `value` entry.
+Feed services support both feed subscribers and request/response callers. This is possible because of the "initial" method of the feed object. Let's see an example of a feed and how to use it with both calling models.
 
 ```js
 var list = [],
@@ -206,7 +220,7 @@ api.service('list').extend(
         list.push(params.value)
         subscribers.forEach(function (s)
         {
-            s.insert(value)
+            s.emit('insert', value)
         })
         done()
     },
@@ -214,13 +228,12 @@ api.service('list').extend(
     get: function (params)
     {
         return {
-            value: function (done)
+            initial: function (done)
             {
                 done(null, list)
             },
-            feed: function (subscriber, done)
+            changes: function (subscriber, done)
             {
-                subscriber.initialize(list)
                 subscribers.push(subscriber)
                 
                 return {
@@ -234,7 +247,7 @@ api.service('list').extend(
     }
 })
 
-// Now we can use the service like this
+// Now we can use the service like this (request/response)
 
 api.service('list')
         .push({ value: 'foo' })
@@ -243,19 +256,22 @@ api.service('list')
             console.log(result) // ['foo']
         })
 
-// Or like this
+// Or like this (subscriber)
 
 api.service('list')
         .get(
             {
                 subscriber: {
-                    initialize: function (value)
+                    emit: function (event, value)
                     {
-                        console.log(value) // ['foo']
-                    },
-                    insert: function (value)
-                    {
-                        console.log(value) // 'bar'...'baz'
+                        if (event == 'initial')
+                        {
+                            console.log(value) // ['foo']
+                        }
+                        else
+                        {
+                            console.log(event, value) // 'insert' 'bar'...'insert' 'baz'...
+                        }
                     }
                 }
             }
@@ -284,7 +300,6 @@ api.service('list').before(
         }
     }
 })
-```
 
 // Now we have to provide a value when calling `list.push()` or it won't be run
 
@@ -315,7 +330,7 @@ api.service('list').get({}, function (err, result)
 })
 ```
 
-It's important to note that `after` hooks are never called when subscribing to a feed.
+It's important to note that `after` hooks are never called for feed events.
 
 ### Socket.IO integration
 
@@ -352,4 +367,174 @@ client.emit('calc add', { a: 63, b: 198 }, function (err, feed_id)
 
 # API Docs
 
-[TODO]
+## landho
+
+The landho package. 
+
+```js
+var landho = require('landho')
+```
+
+### Methods
+
+#### landho() -> Application
+
+Create a new landho application instance.
+
+```js
+var api = landho()
+```
+
+## Application
+
+A landho application instance. Use it to create and fetch services and configure app-wide plugins. Create one using `landho()`
+
+### Methods
+
+#### Application.service(string:name, object:configuration) -> Service
+
+Create a new service.
+
+```js
+var foo = api.service(
+    'foo',
+    {
+        add: function (params, done)
+        {
+            done(null, params.a + params.b)
+        }
+    }
+)
+```
+
+This method will throw an error if you try to register a service name that has already been registered.
+
+```js
+var foo = api.service('foo', {}),
+    foo2 = api.service('foo', {}) -> Error('There is already a service registered with the name "foo"')
+```
+
+#### Application.service(string:name) -> Service || null
+
+Fetch a service, if it exists.
+
+```js
+api.service(
+    'foo',
+    {
+        add: function (params, done)
+        {
+            done(null, params.a + params.b)
+        }
+    }
+)
+
+var foo = api.service('foo')
+foo.add({a:1, b:2})
+```
+
+It will return null if the service does not exist.
+
+```js
+var bar = api.service('bar')
+console.log(bar) // -> null
+```
+
+#### Application.configure(function:plugin) -> Application
+
+Configure an application to use the given plugin. Plugins are functions which take an application as an argument and modify them. An example of a plugin is the bundled socket.io integration.
+
+## Service
+
+A service is a named collection of methods and hooks.
+
+### Methods
+
+#### Service(string:name, object:configuration)
+
+Create a new service.
+
+You should not use this method to create services. To create a service use [`Application.service()`](#applicationservicestringname-objectconfiguration---service). That method takes the same arguments as this one but it will register the service on the application. This documentation is here mostly to explain the service configuration parameter.
+
+Creating a service works like this:
+
+```js
+var api = landho()
+api.service('foo', {
+    add: function (params, done)
+    {
+        done(null, params.a + params.b)
+    },
+    multiply: function (params, done)
+    {
+        done(null, params.a * params.b)
+    }
+})
+```
+
+The keys of the configuration object are the names of the service methods and the values are their implementations. There are two ways to implement a service method. First, the standard node continuation style using a `done()` callback that takes an error as the first argument and a result as the second, like our `add()` and `multiply` examples above. The second way is to return a feed, like this:
+
+```js
+var api = landho()
+api.service('bar', {
+    counter: function (params)
+    {
+        return {
+            initial: function (done)
+            {
+                done(null, 0)
+            },
+            changes: function (subscriber, done)
+            {
+                var counter = 0
+                var interval = setTimeout(function ()
+                {
+                    subscriber.emit('update', ++counter)
+                }, 1000)
+                done(null, {
+                    close: function ()
+                    {
+                        clearInterval(interval)
+                    }
+                })
+            }
+        }
+    }
+})
+```
+
+##### Feed methods
+
+###### Feed.initial(function:done(mixed:error, mixed:result)) -> null
+
+Takes a `done()` callback and calls it either with an error or a value representing the initial state of the feed.
+
+###### Feed.changes(object:subscriber, function:done(mixed:error, mixed:result)) -> null
+
+The `subscriber` is an object with an `emit()` method that the feed may use to notify the subscriber of changes. The `done()` callback is called by the feed either with an error as the first argument or with a feed handle as the second argument. The feed handle has one method called `close` that indicates the caller no longer wishes to receive changes. The feed must terminate messages to the subscriber when the `close` method is called.
+
+*__TIP:__ Keep in mind that because of the asynchronous nature of feeds it is quite possible for messages to be received after a call to `close()`. This is especially true if you introduce any latency between the feed and the subscriber like, for instance, connecting them over a network.*
+
+##### `params` object
+
+The first argument to a service method is always a `params` object. This is all the parameters set by the caller then run through the `before` hooks.
+
+#### Service.extend(object:configuration) -> Service
+
+Add methods to an existing service. The `configuration` object is exactly like the one used when [creating a service](#servicestringname-objectconfiguration). Attempting to use a method name that has already been registered either during creation or a previous call to `extend()` will throw an error.
+
+#### Service.before(object:hooks) -> Service
+
+Add one or more hooks that will run before service methods. The `hooks` argument is an object where the keys are the names of service methods and the values are before hook implementations. A before hook has this signature:
+
+##### hook(object:params, function:next) -> null
+
+Hooks may modify the `params` object. When a hook is complete, it should call the `next()` function that was passed as the second argument. `next()` should be called with an error argument if the hook wants to stop execution of the service method, otherwise it should be called with no arguments. If `next()` is not called, execution will silently stop.
+
+#### Service.after(object:hooks) -> Service
+
+Add one or more hooks that will run after a service method completes successfully but before the caller receives the response. After hooks are run for request/response calls and before the callback of the `initial` method of a feed but not for the messages emitted to a subscriber of a feed.
+
+After hooks are almost the same as before hooks. The main difference is when they run and the fact that the `params` object will have a `result` property. This is the result of the service method call and it can be manipulated by the after hook.
+
+See the [hooks section](#hooks) of the guide for examples of before and after hooks.
