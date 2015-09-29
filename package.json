@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "scripts": {
     "test": "mocha --recursive tests/* lib/*",
-    "test-travis": "istanbul cover _mocha -- tests --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
+    "test-travis": "istanbul cover _mocha -- tests/* --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
   },
   "repository": {
     "type": "git",

@@ -3,6 +3,7 @@
 .cache
 coverage.xml
 cover/
+coverage/
 
 # Translations
 *.mo
