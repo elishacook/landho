@@ -2,8 +2,7 @@
 
 A data service library for node.
 
-`<disclaimer>This is a new project and is changing rapidly.</disclaimer>`
-
+[![Build Status][1]][2] [![Coverage Status][3]][4]
 
 * [Install](#install)
 * [Flavor](#flavor)
@@ -538,3 +537,8 @@ Add one or more hooks that will run after a service method completes successfull
 After hooks are almost the same as before hooks. The main difference is when they run and the fact that the `params` object will have a `result` property. This is the result of the service method call and it can be manipulated by the after hook.
 
 See the [hooks section](#hooks) of the guide for examples of before and after hooks.
+
+[1]: https://secure.travis-ci.org/elishacook/landho.svg
+[2]: https://travis-ci.org/elishacook/landho
+[3]: http://img.shields.io/coveralls/elishacook/landho.svg
+[4]: https://coveralls.io/r/elishacook/landho

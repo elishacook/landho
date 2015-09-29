@@ -4,7 +4,12 @@
   "description": "",
   "main": "lib/index.js",
   "scripts": {
-    "test": "mocha --recursive tests/* lib/*"
+    "test": "mocha --recursive tests/* lib/*",
+    "test-travis": "istanbul cover _mocha -- tests --recursive; echo \"\nCoverage report is available at ./coverage/lcov-report/index.html\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elishacook/landho"
   },
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
@@ -13,6 +18,8 @@
   },
   "devDependencies": {
     "chai": "^3.0.0",
+    "coveralls": "^2.11.4",
+    "istanbul": "^0.3.21",
     "mocha": "^2.2.5",
     "sinon": "^1.15.4",
     "sinon-chai": "^2.8.0",
