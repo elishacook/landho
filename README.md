@@ -542,5 +542,5 @@ See the [hooks section](#hooks) of the guide for examples of before and after ho
 [2]: https://travis-ci.org/elishacook/landho
 [3]: http://img.shields.io/coveralls/elishacook/landho.svg
 [4]: https://coveralls.io/r/elishacook/landho
-[5]: https://badge.fury.io/js/mchammer.svg
-[6]: https://badge.fury.io/js/mchammer
+[5]: https://badge.fury.io/js/landho.svg
+[6]: https://badge.fury.io/js/landho
