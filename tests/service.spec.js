@@ -115,6 +115,41 @@ describe('Service', function ()
         }).to.throw('Attempting to hook unregistered method "things"')
     })
     
+    it('can register multiple hooks for a method using an array', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                params.list.push('third')
+                done(null, params.list)
+            }
+        })
+        
+        foo
+            .before(
+            {
+                stuff: [
+                    function (params, next) { params.list.push('first'); next() },
+                    function (params, next) { params.list.push('second'); next() }
+                ]
+            })
+            .after(
+            {
+                stuff: [
+                    function (params, next) { params.list.push('fourth'); next() },
+                    function (params, next) { params.list.push('fifth'); next() }
+                ]
+            })
+        
+        foo.stuff({ list: [] }, function (err, result)
+        {
+            expect(err).to.be.null
+            expect(result).to.deep.equal(['first', 'second', 'third', 'fourth', 'fifth'])
+            done()
+        })
+    })
+    
     it('returns the value from a method result that has a feed if the caller does not provide a subscriber', function (done)
     {
         var foo = new Service('foo',
