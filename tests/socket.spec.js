@@ -6,18 +6,18 @@ var PORT = 5151,
         transports: ['websocket'],
         'force new connection': true
     },
-    io = require('socket.io').listen(PORT),
-    io_client = require('socket.io-client'),
+    WebSocket = require('ws'),
+    wss = new WebSocket.Server({ port: PORT }),
     landho = require('../lib'),
     api = landho()
     
 api
-    .configure(landho.socket(io))
+    .configure(landho.socket(wss))
     .service('calc',
     {
         wrong: function (params, done)
         {
-            done({ message: 'wrong' })
+            done({ code: 123, message: 'wrong' })
         },
         
         add: function (params, done)
@@ -51,105 +51,149 @@ describe('socket', function ()
 {
     it('can call a request/response method', function (done)
     {
-        var client = io_client.connect(URL, OPTIONS)
-        client.on('connect', function ()
+        var client = new WebSocket(URL)
+        client.on('open', function ()
         {
-            client.emit('calc add', { a: 3, b: 2 }, function (err, feed_id)
+            var message_id = 'first-test-call'
+            
+            client.on('message', function (raw_message)
             {
-                client.on(feed_id+' initial', function (result)
-                {
-                    expect(result).to.equal(5)
-                    client.disconnect()
-                    done()
-                })
+                var message = JSON.parse(raw_message)
+                expect(message.name).to.equal(message_id +' initial')
+                expect(message.data).to.equal(5)
+                done()
             })
+            
+            client.send(JSON.stringify(
+            {
+                id: message_id,
+                name: 'calc add',
+                data: { a: 3, b: 2 }
+            }))
         })
     })
     
     it('can call a feed method', function (done)
     {
-        var client = io_client.connect(URL, OPTIONS)
-        client.on('connect', function ()
+        var client = new WebSocket(URL)
+        client.on('open', function ()
         {
-            client.emit('calc counter', {}, function (err, feed_id)
+            var message_id = 'second-test-call',
+                calls = 0
+            
+            client.on('message', function (raw_message)
             {
-                expect(err).to.be.null
+                calls++
                 
-                var calls = 0
+                var message = JSON.parse(raw_message)
                 
-                client.on(feed_id + ' initial', function (c)
+                if (message.name == message_id+' initial')
                 {
-                    expect(c).to.equal(0)
-                    calls++
-                })
-                
-                client.on(feed_id + ' update', function (c)
+                    expect(message.data).to.equal(0)
+                }
+                else if (message.name == message_id+' update')
                 {
                     expect(calls).to.be.gt(0)
-                    expect(c).to.equal(calls)
-                    calls++
+                    expect(message.data).to.equal(calls - 1)
                     
-                    if (calls > 3)
+                    if (calls == 4)
                     {
-                        client.disconnect()
+                        client.close()
                         done()
                     }
-                })
+                }
             })
+            
+            client.send(JSON.stringify(
+            {
+                id: message_id,
+                name: 'calc counter',
+                data: {}
+            }))
         })
     })
     
     it('can close a feed from the client', function (done)
     {
-        var client = io_client.connect(URL, OPTIONS)
-        client.on('connect', function ()
+        var client = new WebSocket(URL)
+        client.on('open', function ()
         {
-            client.emit('calc counter', {}, function (err, feed_id)
+            var message_id = 'second-test-call',
+                calls = 0
+            
+            client.on('message', function (raw_message)
             {
-                expect(err).to.be.null
+                calls++
                 
-                var calls = 0
+                var message = JSON.parse(raw_message)
                 
-                client.on(feed_id + ' initial', function (c)
+                if (message.name == message_id+' initial')
                 {
-                    expect(c).to.equal(0)
-                    calls++
-                })
-                
-                client.on(feed_id + ' update', function (c)
+                    expect(message.data).to.equal(0)
+                }
+                else if (message.name == message_id+' update')
                 {
                     expect(calls).to.be.gt(0)
-                    expect(c).to.equal(calls)
-                    calls++
+                    expect(message.data).to.equal(calls - 1)
                     
-                    if (calls == 2)
+                    if (calls == 3)
                     {
                         // We have to leave some time for 
                         // update events in the pipe to arrive
                         // before we check to see if the feed
                         // has stopped
-                        client.emit(feed_id + ' close')
+                        client.send(JSON.stringify(
+                        {
+                            id: message_id,
+                            name: 'close'
+                        }))
+                        
                         setTimeout(function ()
                         {
                             var orig_calls = calls
                             setTimeout(function ()
                             {
                                 expect(calls).to.equal(orig_calls)
-                                client.disconnect()
+                                client.close()
                                 done()
-                            }, 50)
-                        }, 50)
+                            }, 10)
+                        }, 10)
                     }
-                })
+                }
             })
+            
+            client.send(JSON.stringify(
+            {
+                id: message_id,
+                name: 'calc counter',
+                data: {}
+            }))
         })
     })
     
-    it('calls the callback with the error if there is an inital error', function (done)
+    it('sends error messages', function (done)
     {
-        var client = io_client.connect(URL, OPTIONS)
-        client.on('connect', function ()
+        var client = new WebSocket(URL)
+        client.on('open', function ()
         {
+            var message_id = 'third-test-call',
+                calls = 0
+            
+            client.on('message', function (raw_message)
+            {
+                var message = JSON.parse(raw_message)
+                expect(message.name).to.equal(message_id+' error')
+                expect(message.data).to.deep.equal({ code: 123, message: 'wrong' })
+                done()
+            })
+            
+            client.send(JSON.stringify(
+            {
+                id: message_id,
+                name: 'calc wrong',
+                data: {}
+            }))
+            
             client.emit('calc wrong', {}, function (err)
             {
                 expect(err).to.not.be.undefined

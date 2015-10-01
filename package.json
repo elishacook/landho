@@ -1,6 +1,6 @@
 {
   "name": "landho",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "",
   "main": "lib/index.js",
   "scripts": {
@@ -13,15 +13,12 @@
   },
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
-  "dependencies": {
-    "socketio-wildcard": "^0.1.1"
-  },
+  "dependencies": {},
   "devDependencies": {
     "chai": "^3.0.0",
     "coveralls": "^2.11.4",
     "istanbul": "^0.3.21",
     "mocha": "^2.2.5",
-    "socket.io": "^1.3.7",
-    "socket.io-client": "^1.3.7"
+    "ws": "^0.8.0"
   }
 }
