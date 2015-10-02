@@ -2,7 +2,7 @@
 
 A data service library for node.
 
-[![Build Status][1]][2] [![Coverage Status][3]][4] [![NPM version][5]][6]
+[![Build Status][1]][2] [![NPM version][3]][4]
 
 * [Install](#install)
 * [Flavor](#flavor)
@@ -11,7 +11,7 @@ A data service library for node.
    * [Creating realtime feeds](#creating-realtime-feeds)
    * [Feed calling styles](#feed-calling-styles)
    * [Before and after hooks](#hooks)
-   * [Socket.IO integration](#socketio-integration)
+   * [WebSocket integration](#websocket-integration)
 * [API Docs](#api-docs)
 
 ## What you get
@@ -32,15 +32,13 @@ npm install --save landho
 
 ```js
 
+// Create a landho instance
 var landho = require('landho'),
-    // Create a landho instance
-    api = landho(),
-    // Create a socket.io server
-    io = require('socket.io').listen(5000)
+    api = landho()
 
 api
-    // Setup the landho instance to use the socket.io server
-    .configure(landho.socket(io))
+    // Setup the landho instance to use the web socket server
+    .configure(landho.socket(wss))
     
     // Create a new service with a single method called 'counter'
     .service('foo',
@@ -78,25 +76,16 @@ api
         }
     })
 
-// Create a client and connect to the socket.io server
-var client = require('socket.io-client').connect('http://0.0.0.0:5000', { transports: ['websocket'] })
-
-// Call the counter() method on the 'foo' service
-client.emit('foo counter', { start: 10 }, function (err, feed_id)
-{
-    // Use the feed_id passed to the acknowledgement callback
-    // to set up listeners for the feed events
-    client.on(feed_id+' inital', function (c)
-    {
-        console.log(c) // -> 100
-    })
-    
-    client.on(feed_id+' update', function (c)
-    {
-        console.log(c) // -> 101...102...103...
-    })
+// Lookup the serive and call the counter() method
+api.service('foo').counter({
+    start: 10,
+    subscriber: {
+        emit: function (event_name, value)
+        {
+            console.log(event_name, value) // 'initial' 100...'update' 101...'update' 102
+        }
+    }
 })
-
 ```
 
 ## Guide
@@ -331,19 +320,20 @@ api.service('list').get({}, function (err, result)
 
 It's important to note that `after` hooks are never called for feed events.
 
-### Socket.IO integration
+### WebSocket integration
 
-Landho can integrate with a [socket.io](http://socket.io/) server. You can set it up like this:
+Landho can expose services over web sockets. Here is an example using [ws](https://github.com/websockets/ws).
 
 ```js
 var landho = require('landho'),
     api = landho(),
-    io = require('socket.io').listen(5000)
+    WebSocket = require('ws'),
+    wss = new WebSocket.Server({ port:5000 })
 
-api.configure(landho.socket(io))
+api.configure(landho.socket(wss))
 ```
 
-That's all that's needed. To call methods using the socket.io client, pass in the service name and the method name separated by spaces and use the acknowledgement callback to register listeners for the feed events. This is how it's done regardless of whether you are calling a feed method or a request/response method. For example...
+That's all that's needed. To call methods over a websocket, send a message including a service method name, data and a unique id. Listen for feed events having the same id you sent in the initial call. This is how it's done regardless of whether you are calling a feed method or a request/response method. Below we show a raw WebSocket client, but you will probably have an easier time using [landho-client](https://github.com/elishacook/landho-client).
 
 ```js
 api.service('calc',
@@ -354,13 +344,27 @@ api.service('calc',
     }
 })
 
-var client = require('socket.io-client').connect('http://0.0.0.0:5000', { transports: ['websocket'] })
-client.emit('calc add', { a: 63, b: 198 }, function (err, feed_id)
+var client = new WebSocket('http://0.0.0.0:5000')
+
+client.on('open', function ()
 {
-    client.on(feed_id + ' initial', function (result)
+    client.on('message', function (raw)
     {
-        console.log(result) // -> 261
+        var message = JSON.parse(raw)
+        console.log(message)
+        // {
+        //     id: 'some-id',
+        //     name: 'initial',
+        //     data: 5
+        // }
     })
+    
+    client.send(JSON.stringify(
+    {
+        id: 'some-id',
+        name: 'calc add',
+        data: { a: 2, b: 3 }
+    }))
 })
 ```
 
@@ -441,7 +445,7 @@ console.log(bar) // -> null
 
 #### Application.configure(function:plugin) -> Application
 
-Configure an application to use the given plugin. Plugins are functions which take an application as an argument and modify them. An example of a plugin is the bundled socket.io integration.
+Configure an application to use the given plugin. Plugins are functions which take an application as an argument and modify them.
 
 ## Service
 
@@ -540,7 +544,5 @@ See the [hooks section](#hooks) of the guide for examples of before and after ho
 
 [1]: https://secure.travis-ci.org/elishacook/landho.svg
 [2]: https://travis-ci.org/elishacook/landho
-[3]: http://img.shields.io/coveralls/elishacook/landho.svg
-[4]: https://coveralls.io/r/elishacook/landho
-[5]: https://badge.fury.io/js/landho.svg
-[6]: https://badge.fury.io/js/landho
+[3]: https://badge.fury.io/js/landho.svg
+[4]: https://badge.fury.io/js/landho

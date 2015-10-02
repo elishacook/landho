@@ -59,7 +59,8 @@ describe('socket', function ()
             client.on('message', function (raw_message)
             {
                 var message = JSON.parse(raw_message)
-                expect(message.name).to.equal(message_id +' initial')
+                expect(message.id).to.equal(message_id)
+                expect(message.name).to.equal('initial')
                 expect(message.data).to.equal(5)
                 done()
             })
@@ -87,11 +88,13 @@ describe('socket', function ()
                 
                 var message = JSON.parse(raw_message)
                 
-                if (message.name == message_id+' initial')
+                expect(message.id).to.equal(message_id)
+                
+                if (message.name == 'initial')
                 {
                     expect(message.data).to.equal(0)
                 }
-                else if (message.name == message_id+' update')
+                else if (message.name == 'update')
                 {
                     expect(calls).to.be.gt(0)
                     expect(message.data).to.equal(calls - 1)
@@ -127,11 +130,13 @@ describe('socket', function ()
                 
                 var message = JSON.parse(raw_message)
                 
-                if (message.name == message_id+' initial')
+                expect(message.id).to.equal(message_id)
+                
+                if (message.name == 'initial')
                 {
                     expect(message.data).to.equal(0)
                 }
-                else if (message.name == message_id+' update')
+                else if (message.name == 'update')
                 {
                     expect(calls).to.be.gt(0)
                     expect(message.data).to.equal(calls - 1)
@@ -182,7 +187,8 @@ describe('socket', function ()
             client.on('message', function (raw_message)
             {
                 var message = JSON.parse(raw_message)
-                expect(message.name).to.equal(message_id+' error')
+                expect(message.id).to.equal(message_id)
+                expect(message.name).to.equal('error')
                 expect(message.data).to.deep.equal({ code: 123, message: 'wrong' })
                 done()
             })
