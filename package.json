@@ -13,7 +13,9 @@
   },
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
-  "dependencies": {},
+  "dependencies": {
+    "uuid": "^2.0.1"
+  },
   "devDependencies": {
     "chai": "^3.0.0",
     "coveralls": "^2.11.4",
