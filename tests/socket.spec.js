@@ -9,12 +9,23 @@ var PORT = 5151,
     WebSocket = require('ws'),
     wss = new WebSocket.Server({ port: PORT }),
     landho = require('../lib'),
-    api = landho()
-    
+    api = landho(),
+    api_server = landho.socket(api, wss)
+
+api_server.use(function (client, next)
+{
+    client.params.foo = 23
+    next()
+})
+
 api
-    .configure(landho.socket(wss))
     .service('calc',
     {
+        check_middleware: function (params, done)
+        {
+            done(null, params.foo)
+        },
+        
         wrong: function (params, done)
         {
             done({ code: 123, message: 'wrong' })
@@ -206,6 +217,30 @@ describe('socket', function ()
                 expect(err.message).to.equal('wrong')
                 done()
             })
+        })
+    })
+    
+    it('can have middleware that modifies all request parameters', function (done)
+    {
+        var client = new WebSocket(URL)
+        client.on('open', function ()
+        {
+            var message_id = 'fourth-test-call'
+            
+            client.on('message', function (raw_message)
+            {
+                var message = JSON.parse(raw_message)
+                expect(message.id).to.equal(message_id)
+                expect(message.name).to.equal('initial')
+                expect(message.data).to.equal(23)
+                done()
+            })
+            
+            client.send(JSON.stringify(
+            {
+                id: message_id,
+                name: 'calc check_middleware'
+            }))
         })
     })
 })
