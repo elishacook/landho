@@ -255,4 +255,39 @@ describe('Service', function ()
         )
     })
     
+    it('calls the subscriber with the initial result before changes', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                return {
+                    initial: function (done)
+                    {
+                        done(null, 123)
+                    },
+                    changes: function (subscriber, done)
+                    {
+                        subscriber.emit('change', 'foo')
+                        done(null, { close: function () {} })
+                    }
+                }
+            }
+        })
+        
+        var subscriber = { emit: sinon.stub() }
+        
+        foo.stuff(
+            {
+                subscriber: subscriber,
+            },
+            function (err, feed)
+            {
+                expect(subscriber.emit).to.have.been.calledTwice
+                expect(subscriber.emit.firstCall.args).to.deep.equal(['initial', 123])
+                expect(subscriber.emit.secondCall.args).to.deep.equal(['change', 'foo'])
+                done()
+            }
+        )
+    })
 })
