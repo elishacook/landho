@@ -8,15 +8,14 @@ A data service library for node.
 * [Flavor](#flavor)
 * [Guide](#guide)
    * [Basics](#basics)
-   * [Creating realtime feeds](#creating-realtime-feeds)
-   * [Feed calling styles](#feed-calling-styles)
+   * [Channels](#channels)
    * [Before and after hooks](#hooks)
    * [WebSocket integration](#websocket-integration)
 * [API Docs](#api-docs)
 
 ## What you get
 
-* One API for creating services with both request/response and realtime feed models
+* An API for creating services that support asynchronous communication
 * Socket.IO integration
 * [TODO] Express integration
 * Hooks so you can validate, authorize or do whatever
@@ -40,51 +39,57 @@ api
     // Setup the landho instance to use the web socket server
     .configure(landho.socket(wss))
     
-    // Create a new service with a single method called 'counter'
-    .service('foo',
+    // Create a new service with a couple of methods
+    .service('calc',
     {
-        counter: function (params)
+        add: function (params, done)
         {
-            // Return a feed object that updates a counter and pushes
-            // the changes to a subscriber
-            return {
-                initial: function (done) { done(null, params.start) },
-                changes: function (subscriber, done)
-                {
-                    var c = params.start,
-                        interval = setInterval(function ()
-                        {
-                            subscriber.emit('update', ++c)
-                        }, 500)
-                        
-                    done(null, { close: clearInterval.bind(null, interval) })
-                }
-            }
+            // Use the regular node callback style
+            done(null, params.a + params.b)
+        },
+        
+        counter: function (params, done)
+        {
+            var channel = new landho.Channel(),
+                interval = null,
+                counter = 0
+            
+            channel.on('close', function ()
+            {
+                clearInterval(interval)
+            })
+            
+            interval = setInterval(function ()
+            {
+                channel.emit('update', counter++)
+            }, 500)
+            
+            done(null, channel)
         }
     })
-    // add a hook before the counter method that messes with the parameters
+    // add a hook before the add method that messes with the parameters
     .before(
     {
-        counter: function (params, next)
+        add: function (params, next)
         {
-            if (!params.start)
-            {
-                params.start = 0
-            }
+            params.a = params.a * params.a
             
-            params.start = params.start * params.start
+            // Don't foregt to call next(). You can pass it an error
+            // if something bad happens.
+            next()
         }
     })
 
-// Lookup the serive and call the counter() method
-api.service('foo').counter({
-    start: 10,
-    subscriber: {
-        emit: function (event_name, value)
+// Lookup the service and call the counter() method
+api.service('foo').counter({}, function (err, channel)
+{
+    channel.on('update', function (x)
+    {
+        if (x == 10)
         {
-            console.log(event_name, value) // 'initial' 100...'update' 101...'update' 102
+            channel.close()
         }
-    }
+    })
 })
 ```
 
@@ -123,11 +128,11 @@ api.service('calculator').add(
 )
 ```
 
-As you can see, services are basically collections of methods written in standard node continuation style. This is how you create services with a request/response model. There's lots more you can do.
+As you can see, services are basically collections of methods written in standard node continuation style. There is more you can do, though.
 
-### Creating realtime feeds
+### Channels
 
-To create a service that provides a realtime feed, write your method to return a feed object.
+To create a service that provides asynchronous communication, return a channel object from a service method. Channels are bi-directional communication streams with the same interface as `EventEmitter`.
 
 ```js
 
@@ -135,138 +140,57 @@ To create a service that provides a realtime feed, write your method to return a
 // it with a new method.
 api.service('counter',
 {
-    // Notice that we ignore the `done` callback. 
-    // It doesn't get used when we return a feed object.
-    create: function (params)
+    create: function (params, done)
     {
-        // Feed objects have two methods. inital() sets the initial value
-        // and changes() notifies subscribers about changes.
-        return {
-            initial: function (done)
-            {
-                done(null, 0)
-            },
-            changes: function (subscriber, done)
-            {
-                var counter = 0
-                var interval = setInterval(function ()
-                {
-                    counter += 1
-                    
-                    // Updates the subscriber each time the count
-                    // is incremented
-                    subscriber.emit('update', counter)
-                }, 1000)
-                
-                // Call the callback with an object that has a `close()`
-                // method that will ensure the subscriber is no longer updated.
-                done(null, { 
-                    close: function () {
-                        clearInterval(interval)
-                    }
-                })
-            }
-        }
+        var channel = new landho.Channel(),
+            interval = null,
+            counter = 0
+        
+        // This event will be emitted when the caller
+        // calls channel.close()
+        channel.on('close', function ()
+        {
+            clearInterval(interval)
+        })
+        
+        // You can also subscribe to arbitrary events
+        channel.on('foo', function (data)
+        {
+            console.log(data)
+        })
+        
+        interval = setInterval(function ()
+        {
+            // Emit arbitrary events
+            channel.emit('update', counter++)
+        }, 500)
+        
+        // Send the channel to the caller
+        done(null, channel)
     }
 })
 
-// We can subscribe to the feed by passing a subscriber 
-// object in the the params.
+// The caller gets the other end of the channel.
 api.service('counter').create(
+    {},
+    function (err, channel)
     {
-        subscriber: {
-            // Gets called on each increment
-            emit: function (event, value)
-            {
-                console.log(event, value) // 'initial' 0...'update' 1...'update' 2...
-            }
-        }
-    },
-    function (err, feed)
-    {
-        // And when we are done, we'll want to close the feed
+        // Listen for events
+        channel.on('update', function (counter)
+        {
+            console.log(counter) // 0...1...2..3...
+        })
+        
+        // Send arbitrary events
+        channel.emit('foo', 123)
+        
+        // And when we are done, close the channel
         setTimeout(function ()
         {
-            feed.close()
-        }, 10000)
+            channel.close()
+        }, 1000)
     }
 )
-```
-
-### Feed calling styles
-
-Feed services support both feed subscribers and request/response callers. This is possible because of the "initial" method of the feed object. Let's see an example of a feed and how to use it with both calling models.
-
-```js
-var list = [],
-    subscribers = []
-
-api.service('list').extend(
-{
-    push: function (params, done)
-    {
-        list.push(params.value)
-        subscribers.forEach(function (s)
-        {
-            s.emit('insert', value)
-        })
-        done()
-    },
-    
-    get: function (params)
-    {
-        return {
-            initial: function (done)
-            {
-                done(null, list)
-            },
-            changes: function (subscriber, done)
-            {
-                subscribers.push(subscriber)
-                
-                return {
-                    close: function ()
-                    {
-                        subscribers.splice(subscribers.indexOf(subscriber), 1)
-                    }
-                }
-            }
-        }
-    }
-})
-
-// Now we can use the service like this (request/response)
-
-api.service('list')
-        .push({ value: 'foo' })
-        .get({}, function (err, result)
-        {
-            console.log(result) // ['foo']
-        })
-
-// Or like this (subscriber)
-
-api.service('list')
-        .get(
-            {
-                subscriber: {
-                    emit: function (event, value)
-                    {
-                        if (event == 'initial')
-                        {
-                            console.log(value) // ['foo']
-                        }
-                        else
-                        {
-                            console.log(event, value) // 'insert' 'bar'...'insert' 'baz'...
-                        }
-                    }
-                }
-            }
-        )
-        .push({ value: 'bar' })
-        .push({ value: 'baz' })
-
 ```
 
 ### Hooks
@@ -320,9 +244,12 @@ api.service('list').get({}, function (err, result)
 
 It's important to note that `after` hooks are never called for feed events.
 
+
 ### WebSocket integration
 
-Landho can expose services over web sockets. Here is an example using [ws](https://github.com/websockets/ws).
+Landho can expose services over web sockets. You can write your own clients but there is also a [landho-client](https://github.com/elishacook/landho-client) that uses native web sockets.
+
+Here is an example using [ws](https://github.com/websockets/ws).
 
 ```js
 var landho = require('landho'),
@@ -333,7 +260,7 @@ var landho = require('landho'),
 api.configure(landho.socket(wss))
 ```
 
-That's all that's needed. To call methods over a websocket, send a message including a service method name, data and a unique id. Listen for feed events having the same id you sent in the initial call. This is how it's done regardless of whether you are calling a feed method or a request/response method. Below we show a raw WebSocket client, but you will probably have an easier time using [landho-client](https://github.com/elishacook/landho-client).
+That's all that's needed. To call methods over a websocket, send a message including a service method name, data and a unique id. Below we show a raw WebSocket client.
 
 ```js
 api.service('calc',
@@ -357,6 +284,58 @@ client.on('open', function ()
         //     name: 'initial',
         //     data: 5
         // }
+    })
+    
+    client.send(JSON.stringify(
+    {
+        id: 'some-id',
+        name: 'calc add',
+        data: { a: 2, b: 3 }
+    }))
+})
+```
+
+Channels are also supported. Here is what a client for the counter service from the [channels section](#channels) section looks like.
+
+
+```js
+
+api.service('counter', ...
+
+var client = ...
+
+client.on('open', function ()
+{
+    var channel_id = null
+    
+    client.on('message', function (raw)
+    {
+        var message = JSON.parse(raw)
+        
+        if (message.id == 'some-id')
+        {
+            assert(message.name == 'result')
+            channel_id = message.data.channel
+        }
+        else if (message.id == channel_id)
+        {
+            assert(message.name == 'channel')
+            assert(message.data.name == 'update')
+            console.log(message.data.data) // 0...1...2...3...
+            
+            if (message.data.data == 10)
+            {
+                client.send(JSON.stringify(
+                {
+                    id: channel_id,
+                    name: 'channel',
+                    data:
+                    {
+                        name: 'close'
+                    }
+                }))
+            }
+        }
     })
     
     client.send(JSON.stringify(
@@ -443,10 +422,6 @@ var bar = api.service('bar')
 console.log(bar) // -> null
 ```
 
-#### Application.configure(function:plugin) -> Application
-
-Configure an application to use the given plugin. Plugins are functions which take an application as an argument and modify them.
-
 ## Service
 
 A service is a named collection of methods and hooks.
@@ -475,52 +450,7 @@ api.service('foo', {
 })
 ```
 
-The keys of the configuration object are the names of the service methods and the values are their implementations. There are two ways to implement a service method. First, the standard node continuation style using a `done()` callback that takes an error as the first argument and a result as the second, like our `add()` and `multiply` examples above. The second way is to return a feed, like this:
-
-```js
-var api = landho()
-api.service('bar', {
-    counter: function (params)
-    {
-        return {
-            initial: function (done)
-            {
-                done(null, 0)
-            },
-            changes: function (subscriber, done)
-            {
-                var counter = 0
-                var interval = setTimeout(function ()
-                {
-                    subscriber.emit('update', ++counter)
-                }, 1000)
-                done(null, {
-                    close: function ()
-                    {
-                        clearInterval(interval)
-                    }
-                })
-            }
-        }
-    }
-})
-```
-
-##### Feed methods
-
-###### Feed.initial(function:done(mixed:error, mixed:result)) -> null
-
-Takes a `done()` callback and calls it either with an error or a value representing the initial state of the feed.
-
-###### Feed.changes(object:subscriber, function:done(mixed:error, mixed:result)) -> null
-
-The `subscriber` is an object with an `emit()` method that the feed may use to notify the subscriber of changes. The `done()` callback is called by the feed either with an error as the first argument or with a feed handle as the second argument. The feed handle has one method called `close` that indicates the caller no longer wishes to receive changes. The feed must terminate messages to the subscriber when the `close` method is called.
-
-*__TIP:__ Keep in mind that because of the asynchronous nature of feeds it is quite possible for messages to be received after a call to `close()`. This is especially true if you introduce any latency between the feed and the subscriber like, for instance, connecting them over a network.*
-
-##### `params` object
-
-The first argument to a service method is always a `params` object. This is all the parameters set by the caller then run through the `before` hooks.
+The keys of the configuration object are the names of the service methods and the values are their implementations. Service methods all have the same signature `method_name(<params>, <callback>)` and the callback uses the standard node form `callback(error, result)`.
 
 #### Service.extend(object:configuration) -> Service
 

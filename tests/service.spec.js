@@ -1,6 +1,9 @@
 'use strict'
 
-var Service = require('../lib/Service')
+var Service = require('../lib/Service'),
+    channel = require('../lib/channel'),
+    Channel = channel.Channel,
+    ChannelEnd = channel.ChannelEnd
 
 describe('Service', function ()
 {
@@ -149,145 +152,29 @@ describe('Service', function ()
             done()
         })
     })
-    
-    it('returns the value from a method result that has a feed if the caller does not provide a subscriber', function (done)
+
+    it('returns a ChannelEnd if a service method returns a Channel', function (done)
     {
-        var foo = new Service('foo',
-        {
-            stuff: function (params)
+        var channel = new Channel(),
+            foo = new Service('foo',
             {
-                return {
-                    initial: function (done)
-                    {
-                        done(null, 123)
-                    },
-                    changes: function (subscriber, done)
-                    {
-                        done(null, { close: function () {} })
-                    }
+                stuff: function (params, done)
+                {
+                    done(null, channel)
                 }
-            }
-        })
+            })
+        
         foo.stuff({}, function (err, result)
         {
-            expect(result).to.equal(123)
-            done()
-        })
-    })
-    
-    it('emits the initial event on a subscriber when a subscriber is provided for a method without a feed', function (done)
-    {
-        var foo = new Service('foo',
-        {
-            stuff: function (params, done)
+            expect(result).to.be.instanceof(ChannelEnd)
+            
+            result.on('fnord', function (arg)
             {
-                done(null, 123)
-            }
-        })
-        
-        foo.stuff(
-            {
-                subscriber: {
-                    emit: function (event, value)
-                    {
-                        expect(event).to.equal('initial')
-                        expect(value).to.equal(123)
-                        done()
-                    }
-                }
-            },
-            function ()
-            {
-                
-            }
-        )
-    })
-    
-    it('passes the feed as the result argument to the callback when a subscriber is provided to a feed method', function (done)
-    {
-        var foo = new Service('foo',
-        {
-            stuff: function (params, done)
-            {
-                return {
-                    initial: function (done)
-                    {
-                        done(null, 123)
-                    },
-                    changes: function (subscriber, done)
-                    {
-                        done(null, { close: function () {} })
-                    }
-                }
-            }
-        })
-        
-        foo.stuff(
-            { subscriber: { emit: function (event, value) {} } },
-            function (err, feed)
-            {
-                expect(err).to.be.null
-                expect(feed).to.not.be.undefined
-                expect(feed.close).to.not.be.undefined
+                expect(arg).to.equal(123)
                 done()
-            }
-        )
-    })
-    
-    it('has a null result when calling a non-feed method with a subscriber', function (done)
-    {
-        var foo = new Service('foo',
-        {
-            stuff: function (params, done)
-            {
-                done(null, 123)
-            }
+            })
+            
+            channel.emit('fnord', 123)
         })
-        
-        foo.stuff(
-            { subscriber: { emit: function (event, value) {} } },
-            function (err, feed)
-            {
-                expect(err).to.be.null
-                expect(feed).to.be.null
-                done()
-            }
-        )
-    })
-    
-    it('calls the subscriber with the initial result before changes', function (done)
-    {
-        var foo = new Service('foo',
-        {
-            stuff: function (params, done)
-            {
-                return {
-                    initial: function (done)
-                    {
-                        done(null, 123)
-                    },
-                    changes: function (subscriber, done)
-                    {
-                        subscriber.emit('change', 'foo')
-                        done(null, { close: function () {} })
-                    }
-                }
-            }
-        })
-        
-        var subscriber = { emit: sinon.stub() }
-        
-        foo.stuff(
-            {
-                subscriber: subscriber,
-            },
-            function (err, feed)
-            {
-                expect(subscriber.emit).to.have.been.calledTwice
-                expect(subscriber.emit.firstCall.args).to.deep.equal(['initial', 123])
-                expect(subscriber.emit.secondCall.args).to.deep.equal(['change', 'foo'])
-                done()
-            }
-        )
     })
 })

@@ -1,6 +1,6 @@
 {
   "name": "landho",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "",
   "main": "lib/index.js",
   "scripts": {
@@ -14,6 +14,7 @@
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
+    "middleware-pattern": "^0.1.0",
     "uuid": "^2.0.1"
   },
   "devDependencies": {

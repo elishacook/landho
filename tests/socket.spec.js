@@ -10,7 +10,8 @@ var PORT = 5151,
     wss = new WebSocket.Server({ port: PORT }),
     landho = require('../lib'),
     api = landho(),
-    api_server = landho.socket(api, wss)
+    api_server = landho.socket(api, wss),
+    Channel = require('../lib/channel').Channel
 
 api_server.use(function (client, next)
 {
@@ -18,61 +19,59 @@ api_server.use(function (client, next)
     next()
 })
 
-api
-    .service('calc',
+api.service('calc',
+{
+    check_middleware: function (params, done)
     {
-        check_middleware: function (params, done)
-        {
-            done(null, params.foo)
-        },
+        done(null, params.foo)
+    },
+    
+    wrong: function (params, done)
+    {
+        done({ code: 123, message: 'wrong' })
+    },
+    
+    add: function (params, done)
+    {
+        done(null, params.a + params.b)
+    },
+    
+    counter: function (params, done)
+    {
+        var channel = new Channel(),
+            interval = null,
+            counter = 0
         
-        wrong: function (params, done)
+        channel.on('close', function ()
         {
-            done({ code: 123, message: 'wrong' })
-        },
+            clearInterval(interval)
+        })
         
-        add: function (params, done)
+        interval = setInterval(function ()
         {
-            done(null, params.a + params.b)
-        },
+            channel.emit('update', ++counter)
+        }, 1)
         
-        counter: function (params)
-        {
-            var counter = 0
-                
-            return {
-                initial: function (done)
-                {
-                    done(null, counter)
-                },
-                changes: function (subscriber, done)
-                {
-                    var interval = setInterval(function ()
-                    {
-                        subscriber.emit('update', ++counter)
-                    }, 1)
-                    
-                    done(null, { close: clearInterval.bind(null, interval) })
-                }
-            }
-        }
-    })
+        done(null, channel)
+    }
+})
 
 describe('socket', function ()
 {
-    it('can call a request/response method', function (done)
+    it('can call a method', function (done)
     {
         var client = new WebSocket(URL)
         client.on('open', function ()
         {
-            var message_id = 'first-test-call'
+            var message_id = 'msg-id'
             
             client.on('message', function (raw_message)
             {
                 var message = JSON.parse(raw_message)
                 expect(message.id).to.equal(message_id)
-                expect(message.name).to.equal('initial')
-                expect(message.data).to.equal(5)
+                expect(message.name).to.equal('result')
+                expect(message.data).to.deep.equal({ data: 5 })
+                client.close()
                 done()
             })
             
@@ -85,12 +84,13 @@ describe('socket', function ()
         })
     })
     
-    it('can call a feed method', function (done)
+    it('can interact with a channel response', function (done)
     {
         var client = new WebSocket(URL)
         client.on('open', function ()
         {
-            var message_id = 'second-test-call',
+            var message_id = 'msg-id',
+                channel_id = null,
                 calls = 0
             
             client.on('message', function (raw_message)
@@ -99,16 +99,20 @@ describe('socket', function ()
                 
                 var message = JSON.parse(raw_message)
                 
-                expect(message.id).to.equal(message_id)
-                
-                if (message.name == 'initial')
+                if (message.id == message_id)
                 {
-                    expect(message.data).to.equal(0)
+                    expect(message.name).to.equal('result')
+                    expect(message.data).to.have.property('channel')
+                    channel_id = message.data.channel
                 }
-                else if (message.name == 'update')
+                else
                 {
+                    expect(message.name).to.equal('channel')
                     expect(calls).to.be.gt(0)
-                    expect(message.data).to.equal(calls - 1)
+                    expect(message.data).to.deep.equal({
+                        name: 'update',
+                        data: calls - 1
+                    })
                     
                     if (calls == 4)
                     {
@@ -127,12 +131,13 @@ describe('socket', function ()
         })
     })
     
-    it('can close a feed from the client', function (done)
+    it('can close a channel from the client', function (done)
     {
         var client = new WebSocket(URL)
         client.on('open', function ()
         {
-            var message_id = 'second-test-call',
+            var message_id = 'msg-id',
+                channel_id = null,
                 calls = 0
             
             client.on('message', function (raw_message)
@@ -141,16 +146,20 @@ describe('socket', function ()
                 
                 var message = JSON.parse(raw_message)
                 
-                expect(message.id).to.equal(message_id)
-                
-                if (message.name == 'initial')
+                if (message.id == message_id)
                 {
-                    expect(message.data).to.equal(0)
+                    expect(message.name).to.equal('result')
+                    expect(message.data).to.have.property('channel')
+                    channel_id = message.data.channel
                 }
-                else if (message.name == 'update')
+                else
                 {
+                    expect(message.name).to.equal('channel')
                     expect(calls).to.be.gt(0)
-                    expect(message.data).to.equal(calls - 1)
+                    expect(message.data).to.deep.equal({
+                        name: 'update',
+                        data: calls - 1
+                    })
                     
                     if (calls == 3)
                     {
@@ -160,19 +169,20 @@ describe('socket', function ()
                         // has stopped
                         client.send(JSON.stringify(
                         {
-                            id: message_id,
-                            name: 'close'
+                            id: channel_id,
+                            name: 'channel',
+                            data: {
+                                name: 'close'
+                            }
                         }))
                         
                         setTimeout(function ()
                         {
-                            var orig_calls = calls
-                            setTimeout(function ()
-                            {
-                                expect(calls).to.equal(orig_calls)
-                                client.close()
-                                done()
-                            }, 10)
+                            var keys = Object.keys(api_server.clients)
+                            expect(keys.length).to.equal(1)
+                            var client = api_server.clients[keys[0]]
+                            expect(client.channels).to.deep.equal({})
+                            done()
                         }, 10)
                     }
                 }
@@ -187,52 +197,19 @@ describe('socket', function ()
         })
     })
     
-    it('sends error messages', function (done)
-    {
-        var client = new WebSocket(URL)
-        client.on('open', function ()
-        {
-            var message_id = 'third-test-call',
-                calls = 0
-            
-            client.on('message', function (raw_message)
-            {
-                var message = JSON.parse(raw_message)
-                expect(message.id).to.equal(message_id)
-                expect(message.name).to.equal('error')
-                expect(message.data).to.deep.equal({ code: 123, message: 'wrong' })
-                done()
-            })
-            
-            client.send(JSON.stringify(
-            {
-                id: message_id,
-                name: 'calc wrong',
-                data: {}
-            }))
-            
-            client.emit('calc wrong', {}, function (err)
-            {
-                expect(err).to.not.be.undefined
-                expect(err.message).to.equal('wrong')
-                done()
-            })
-        })
-    })
-    
     it('can have middleware that modifies all request parameters', function (done)
     {
         var client = new WebSocket(URL)
         client.on('open', function ()
         {
-            var message_id = 'fourth-test-call'
+            var message_id = 'msg-id'
             
             client.on('message', function (raw_message)
             {
                 var message = JSON.parse(raw_message)
                 expect(message.id).to.equal(message_id)
-                expect(message.name).to.equal('initial')
-                expect(message.data).to.equal(23)
+                expect(message.name).to.equal('result')
+                expect(message.data).to.deep.equal({ data: 23 })
                 done()
             })
             
