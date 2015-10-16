@@ -14,7 +14,6 @@
   "author": "Elisha Fitch-Cook <elisha@elishacook.com> (https://github.com/elishacook)",
   "license": "MIT",
   "dependencies": {
-    "middleware-pattern": "^0.1.0",
     "uuid": "^2.0.1"
   },
   "devDependencies": {
