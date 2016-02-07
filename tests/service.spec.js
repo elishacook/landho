@@ -177,4 +177,38 @@ describe('Service', function ()
             channel.emit('fnord', 123)
         })
     })
+    
+    it('returns a promise if no callback is passed to a service method', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                done(null, params.a + params.b)
+            }
+        })
+        
+        foo.stuff({a:1, b:10}).then(function (result)
+        {
+            expect(result).to.equal(11)
+            done()
+        })
+    })
+    
+    it('returns a rejected promise if no callback is passed to a service method and there is an error', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                done('bad times')
+            }
+        })
+        
+        foo.stuff({a:1, b:10}).catch(function (err)
+        {
+            expect(err).to.equal('bad times')
+            done()
+        })
+    })
 })
