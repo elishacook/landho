@@ -268,4 +268,43 @@ describe('Service', function ()
         
         return foo.stuff()
     })
+    
+    it('can have a service method that returns a promise', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params)
+            {
+                return new Promise(function (resolve)
+                {
+                    resolve('skidoo')
+                })
+            }
+        })
+        
+        foo.stuff(null, function (err, res)
+        {
+            expect(res).to.equal('skidoo')
+            done()
+        })
+    })
+    
+    it('can have a service method that returns a promise and uses promise calling', function ()
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params)
+            {
+                return new Promise(function (resolve)
+                {
+                    resolve('skidoo')
+                })
+            }
+        })
+        
+        return foo.stuff().then(function (result)
+        {
+            expect(result).to.equal('skidoo')
+        })
+    })
 })
