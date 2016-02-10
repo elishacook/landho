@@ -211,4 +211,54 @@ describe('Service', function ()
             done()
         })
     })
+    
+    it('promises work with before hooks', function (done)
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                done(null, params.a * params.b)
+            }
+        })
+        .before({
+            stuff: function (params, done)
+            {
+                params.b = 100
+                done()
+            }
+        })
+        
+        foo.stuff({a:2, b:10}).then(function (result)
+        {
+            expect(result).to.equal(200)
+            done()
+        })
+    })
+    
+    it('promises work with after hooks', function (done)
+    {
+        var data = { a: 2, b: 10 }
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                done(null, params.a * params.b)
+            }
+        })
+        .after({
+            stuff: function (params, done)
+            {
+                params.c = 'skidoo'
+                done()
+            }
+        })
+        
+        foo.stuff(data).then(function (result)
+        {
+            expect(data.c).to.equal('skidoo')
+            expect(result).to.equal(20)
+            done()
+        })
+    })
 })
