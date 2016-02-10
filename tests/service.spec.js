@@ -178,7 +178,7 @@ describe('Service', function ()
         })
     })
     
-    it('returns a promise if no callback is passed to a service method', function (done)
+    it('returns a promise if no callback is passed to a service method', function ()
     {
         var foo = new Service('foo',
         {
@@ -188,14 +188,13 @@ describe('Service', function ()
             }
         })
         
-        foo.stuff({a:1, b:10}).then(function (result)
+        return foo.stuff({a:1, b:10}).then(function (result)
         {
             expect(result).to.equal(11)
-            done()
         })
     })
     
-    it('returns a rejected promise if no callback is passed to a service method and there is an error', function (done)
+    it('returns a rejected promise if no callback is passed to a service method and there is an error', function ()
     {
         var foo = new Service('foo',
         {
@@ -205,14 +204,13 @@ describe('Service', function ()
             }
         })
         
-        foo.stuff({a:1, b:10}).catch(function (err)
+        return foo.stuff({a:1, b:10}).catch(function (err)
         {
             expect(err).to.equal('bad times')
-            done()
         })
     })
     
-    it('promises work with before hooks', function (done)
+    it('promises work with before hooks', function ()
     {
         var foo = new Service('foo',
         {
@@ -229,16 +227,14 @@ describe('Service', function ()
             }
         })
         
-        foo.stuff({a:2, b:10}).then(function (result)
+        return foo.stuff({a:2, b:10}).then(function (result)
         {
             expect(result).to.equal(200)
-            done()
         })
     })
     
-    it('promises work with after hooks', function (done)
+    it('promises work with after hooks', function ()
     {
-        var data = { a: 2, b: 10 }
         var foo = new Service('foo',
         {
             stuff: function (params, done)
@@ -249,16 +245,27 @@ describe('Service', function ()
         .after({
             stuff: function (params, done)
             {
-                params.c = 'skidoo'
+                params.result = 'skidoo'
                 done()
             }
         })
         
-        foo.stuff(data).then(function (result)
+        return foo.stuff({ a: 2, b: 10 }).then(function (result)
         {
-            expect(data.c).to.equal('skidoo')
-            expect(result).to.equal(20)
-            done()
+            expect(result).to.equal('skidoo')
         })
+    })
+    
+    it('can have a service that returns a null result', function ()
+    {
+        var foo = new Service('foo',
+        {
+            stuff: function (params, done)
+            {
+                done()
+            }
+        })
+        
+        return foo.stuff()
     })
 })
